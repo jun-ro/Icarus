@@ -4,42 +4,55 @@ document.getElementById("app")!.innerHTML = `
   <div class="container">
     <header>
       <h1>Icarus</h1>
-      <p class="subtitle">Serverless P2P — no server required</p>
+      <p class="subtitle">Serverless P2P</p>
     </header>
-
     <div class="status-bar">
       <span id="statusDot" class="dot init"></span>
       <span id="statusText">Choose your role…</span>
     </div>
 
     <div id="stepRole" class="card">
-      <label>Your role</label>
+      <label>Connect</label>
       <div class="btn-row">
         <button id="btnOffer">Create Offer</button>
-        <button id="btnJoin">Join with Offer</button>
+        <button id="btnJoin">Enter Code</button>
       </div>
-      <p class="hint">One peer creates an offer and sends the text to the other.</p>
+      <p class="hint">Same browser: Create Offer → Open in new tab (automatic). Cross-device: share code.</p>
     </div>
 
-    <div id="stepOffer" class="card" hidden>
-      <label>Your Offer <small>— copy and send to peer</small></label>
-      <textarea id="offerOut" class="sdp-box" readonly placeholder="Gathering ICE candidates…"></textarea>
-      <button id="copyOffer" disabled>Copy Offer</button>
-      <hr />
-      <label>Paste peer's Answer</label>
-      <textarea id="answerIn" class="sdp-box" placeholder="Paste answer here…"></textarea>
-      <button id="btnConnect" disabled>Connect</button>
-    </div>
-
-    <div id="stepAccept" class="card" hidden>
-      <label>Paste peer's Offer</label>
-      <textarea id="offerIn" class="sdp-box" placeholder="Paste offer here…"></textarea>
-      <button id="btnGenAnswer">Generate Answer</button>
-      <div id="answerSection" hidden>
+    <div id="stepOffer" hidden>
+      <div class="card">
+        <label>Same browser</label>
+        <button id="btnNewTab">Open in new tab</button>
+        <p id="autoStatus" class="hint"> </p>
+      </div>
+      <div class="card">
+        <label>Cross-device — send this code to peer</label>
+        <textarea id="offerOut" class="sdp-box" readonly placeholder="Generating…"></textarea>
+        <button id="copyOffer" disabled>Copy Code</button>
         <hr />
-        <label>Your Answer <small>— copy and send back</small></label>
-        <textarea id="answerOut" class="sdp-box" readonly></textarea>
-        <button id="copyAnswer">Copy Answer</button>
+        <label>Paste peer's answer code</label>
+        <textarea id="answerIn" class="sdp-box" placeholder="Paste answer code…"></textarea>
+        <button id="btnConnect" disabled>Connect</button>
+      </div>
+    </div>
+
+    <div id="stepAccept" hidden>
+      <div class="card" id="cardAutoAccept" hidden>
+        <label>Offer received from another tab</label>
+        <p id="autoAcceptNote" class="hint">Generating answer…</p>
+        <button id="btnAutoAccept" hidden>Connect</button>
+      </div>
+      <div class="card">
+        <label>Cross-device — paste offer code</label>
+        <textarea id="offerIn" class="sdp-box" placeholder="Paste offer code…"></textarea>
+        <button id="btnGenAnswer">Generate Answer</button>
+        <div id="answerSection" hidden>
+          <hr />
+          <label>Your answer code — copy and send back</label>
+          <textarea id="answerOut" class="sdp-box" readonly></textarea>
+          <button id="copyAnswer">Copy Answer</button>
+        </div>
       </div>
     </div>
 
@@ -52,32 +65,60 @@ document.getElementById("app")!.innerHTML = `
 `;
 
 // ── Element refs ──────────────────────────────────────────────────────────────
-const statusDot    = document.getElementById("statusDot")!;
-const statusText   = document.getElementById("statusText")!;
-const stepRole     = document.getElementById("stepRole")!;
-const stepOffer    = document.getElementById("stepOffer")!;
-const stepAccept   = document.getElementById("stepAccept")!;
-const messagesEl   = document.getElementById("messages")!;
-const composeEl    = document.getElementById("compose")!;
-
-const btnOffer     = document.getElementById("btnOffer") as HTMLButtonElement;
-const btnJoin      = document.getElementById("btnJoin") as HTMLButtonElement;
-const offerOut     = document.getElementById("offerOut") as HTMLTextAreaElement;
-const copyOffer    = document.getElementById("copyOffer") as HTMLButtonElement;
-const answerIn     = document.getElementById("answerIn") as HTMLTextAreaElement;
-const btnConnect   = document.getElementById("btnConnect") as HTMLButtonElement;
-
-const offerIn      = document.getElementById("offerIn") as HTMLTextAreaElement;
-const btnGenAnswer = document.getElementById("btnGenAnswer") as HTMLButtonElement;
+const statusDot     = document.getElementById("statusDot")!;
+const statusText    = document.getElementById("statusText")!;
+const stepRole      = document.getElementById("stepRole")!;
+const stepOffer     = document.getElementById("stepOffer")!;
+const stepAccept    = document.getElementById("stepAccept")!;
+const messagesEl    = document.getElementById("messages")!;
+const composeEl     = document.getElementById("compose")!;
+const btnOffer      = document.getElementById("btnOffer") as HTMLButtonElement;
+const btnJoin       = document.getElementById("btnJoin") as HTMLButtonElement;
+const btnNewTab     = document.getElementById("btnNewTab") as HTMLButtonElement;
+const autoStatus    = document.getElementById("autoStatus")!;
+const offerOut      = document.getElementById("offerOut") as HTMLTextAreaElement;
+const copyOffer     = document.getElementById("copyOffer") as HTMLButtonElement;
+const answerIn      = document.getElementById("answerIn") as HTMLTextAreaElement;
+const btnConnect    = document.getElementById("btnConnect") as HTMLButtonElement;
+const cardAutoAccept = document.getElementById("cardAutoAccept")!;
+const autoAcceptNote = document.getElementById("autoAcceptNote")!;
+const btnAutoAccept = document.getElementById("btnAutoAccept") as HTMLButtonElement;
+const offerIn       = document.getElementById("offerIn") as HTMLTextAreaElement;
+const btnGenAnswer  = document.getElementById("btnGenAnswer") as HTMLButtonElement;
 const answerSection = document.getElementById("answerSection")!;
-const answerOut    = document.getElementById("answerOut") as HTMLTextAreaElement;
-const copyAnswer   = document.getElementById("copyAnswer") as HTMLButtonElement;
-
-const msgInput     = document.getElementById("msgInput") as HTMLInputElement;
-const sendBtn      = document.getElementById("sendBtn") as HTMLButtonElement;
+const answerOut     = document.getElementById("answerOut") as HTMLTextAreaElement;
+const copyAnswer    = document.getElementById("copyAnswer") as HTMLButtonElement;
+const msgInput      = document.getElementById("msgInput") as HTMLInputElement;
+const sendBtn       = document.getElementById("sendBtn") as HTMLButtonElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let activeDc: RTCDataChannel | null = null;
+let initiatorPc: RTCPeerConnection | null = null;
+
+// ── BroadcastChannel (same-browser auto-signaling) ────────────────────────────
+const bc = new BroadcastChannel("icarus");
+bc.postMessage({ type: "ready" });
+
+bc.onmessage = async ({ data }) => {
+  if (data.type === "ready" && initiatorPc?.localDescription) {
+    bc.postMessage({ type: "offer", sdp: initiatorPc.localDescription });
+    autoStatus.textContent = "Other tab detected — waiting for answer…";
+    console.log("[bc] re-sent offer to new tab");
+  }
+  if (data.type === "offer") {
+    console.log("[bc] received offer — auto-processing");
+    stepRole.hidden       = true;
+    stepAccept.hidden     = false;
+    cardAutoAccept.hidden = false;
+    setStatus("connecting", "Offer received — generating answer…");
+    await bcHandleOffer(data.sdp);
+  }
+  if (data.type === "answer" && initiatorPc) {
+    console.log("[bc] received answer — connecting");
+    await initiatorPc.setRemoteDescription(data.sdp);
+    setStatus("connecting", "Connecting…");
+  }
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setStatus(state: "init" | "ready" | "connecting" | "connected" | "error", text: string) {
@@ -112,8 +153,6 @@ function makeCopyBtn(btn: HTMLButtonElement, getText: () => string) {
   });
 }
 
-// Waits for ICE gathering to finish (all candidates bundled into localDescription).
-// Falls back after 8 s so slow STUN lookups don't block indefinitely.
 function waitForIce(pc: RTCPeerConnection): Promise<RTCSessionDescription> {
   return new Promise((resolve) => {
     const done = () => resolve(pc.localDescription!);
@@ -125,6 +164,30 @@ function waitForIce(pc: RTCPeerConnection): Promise<RTCSessionDescription> {
   });
 }
 
+// SDP → compressed base64 (shorter codes for manual exchange)
+async function encode(sdp: RTCSessionDescriptionInit): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(sdp));
+  const cs = new CompressionStream("deflate-raw");
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const buf = await new Response(cs.readable).arrayBuffer();
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+async function decode(b64: string): Promise<RTCSessionDescriptionInit> {
+  const pad = b64.length % 4 ? b64 + "=".repeat(4 - b64.length % 4) : b64;
+  const bin = atob(pad.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  const ds = new DecompressionStream("deflate-raw");
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const text = await new Response(ds.readable).text();
+  return JSON.parse(text);
+}
+
 // ── WebRTC config ─────────────────────────────────────────────────────────────
 const RTC: RTCConfiguration = {
   iceServers: [
@@ -133,7 +196,7 @@ const RTC: RTCConfiguration = {
   ],
 };
 
-// ── Data channel wiring (shared) ──────────────────────────────────────────────
+// ── Data channel wiring ───────────────────────────────────────────────────────
 function wireChannel(dc: RTCDataChannel) {
   activeDc = dc;
   dc.onopen = () => {
@@ -155,6 +218,21 @@ function wireChannel(dc: RTCDataChannel) {
   dc.onerror = (e) => console.error("[dc:error]", e);
 }
 
+// ── BroadcastChannel auto-accept (responder side) ─────────────────────────────
+async function bcHandleOffer(sdpInit: RTCSessionDescriptionInit) {
+  const pc = new RTCPeerConnection(RTC);
+  pc.ondatachannel = (e) => { wireChannel(e.channel); console.log("[bc:answer] got dc"); };
+  pc.onicecandidate = (e) => console.log("[bc:answer:ice]", e.candidate?.type ?? "done");
+
+  await pc.setRemoteDescription(sdpInit);
+  await pc.setLocalDescription(await pc.createAnswer());
+  const desc = await waitForIce(pc);
+
+  bc.postMessage({ type: "answer", sdp: desc });
+  autoAcceptNote.textContent = "Answer sent — waiting for connection…";
+  console.log("[bc:answer] sent answer");
+}
+
 // ── Initiator flow ────────────────────────────────────────────────────────────
 btnOffer.addEventListener("click", async () => {
   stepRole.hidden  = true;
@@ -163,15 +241,21 @@ btnOffer.addEventListener("click", async () => {
   console.log("[offer] init");
 
   const pc = new RTCPeerConnection(RTC);
+  initiatorPc = pc;
   wireChannel(pc.createDataChannel("icarus"));
-
   pc.onicecandidate = (e) => console.log("[offer:ice]", e.candidate?.type ?? "done");
 
   await pc.setLocalDescription(await pc.createOffer());
   const desc = await waitForIce(pc);
-  offerOut.value     = JSON.stringify(desc);
+
+  // Broadcast for same-browser auto-connect
+  bc.postMessage({ type: "offer", sdp: desc });
+  autoStatus.textContent = "Waiting for other tab…";
+
+  // Encode for manual cross-device fallback
+  offerOut.value     = await encode(desc);
   copyOffer.disabled = false;
-  setStatus("ready", "Copy offer → send to peer → paste their answer → Connect");
+  setStatus("ready", "Open new tab — or share code for cross-device");
   console.log("[offer] ready");
 
   answerIn.addEventListener("input", () => {
@@ -180,46 +264,47 @@ btnOffer.addEventListener("click", async () => {
 
   btnConnect.addEventListener("click", async () => {
     try {
-      await pc.setRemoteDescription(JSON.parse(answerIn.value.trim()));
+      await pc.setRemoteDescription(await decode(answerIn.value.trim()));
       setStatus("connecting", "Connecting…");
-      console.log("[offer] remote desc set, waiting for dc open");
+      console.log("[offer] manual answer applied");
     } catch {
-      setStatus("error", "Invalid answer — check pasted text");
+      setStatus("error", "Invalid answer code");
     }
   });
 });
 
-// ── Responder flow ────────────────────────────────────────────────────────────
+btnNewTab.addEventListener("click", () => {
+  window.open(location.href, "_blank");
+});
+
+// ── Responder flow — manual ───────────────────────────────────────────────────
 btnJoin.addEventListener("click", () => {
   stepRole.hidden   = true;
   stepAccept.hidden = false;
-  setStatus("ready", "Paste the offer and click Generate Answer");
+  setStatus("ready", "Paste offer code and click Generate Answer");
 });
 
 btnGenAnswer.addEventListener("click", async () => {
-  const offerStr = offerIn.value.trim();
-  if (!offerStr) return;
+  const raw = offerIn.value.trim();
+  if (!raw) return;
   btnGenAnswer.disabled = true;
   setStatus("connecting", "Gathering ICE candidates…");
-  console.log("[answer] init");
+  console.log("[answer:manual] init");
 
   const pc = new RTCPeerConnection(RTC);
-  pc.ondatachannel = (e) => {
-    wireChannel(e.channel);
-    console.log("[answer] got data channel");
-  };
-  pc.onicecandidate = (e) => console.log("[answer:ice]", e.candidate?.type ?? "done");
+  pc.ondatachannel = (e) => { wireChannel(e.channel); console.log("[answer:manual] got dc"); };
+  pc.onicecandidate = (e) => console.log("[answer:manual:ice]", e.candidate?.type ?? "done");
 
   try {
-    await pc.setRemoteDescription(JSON.parse(offerStr));
+    await pc.setRemoteDescription(await decode(raw));
     await pc.setLocalDescription(await pc.createAnswer());
     const desc = await waitForIce(pc);
-    answerOut.value      = JSON.stringify(desc);
+    answerOut.value      = await encode(desc);
     answerSection.hidden = false;
-    setStatus("ready", "Copy answer → send back to peer. Waiting for connection…");
-    console.log("[answer] ready");
+    setStatus("ready", "Copy answer code → send to peer");
+    console.log("[answer:manual] ready");
   } catch {
-    setStatus("error", "Invalid offer — check pasted text");
+    setStatus("error", "Invalid offer code");
     btnGenAnswer.disabled = false;
   }
 });
