@@ -175,7 +175,7 @@ function lanOnlySdp(sdp: string): string {
 }
 
 async function encode(desc: RTCSessionDescriptionInit): Promise<string> {
-  const filtered = { ...desc, sdp: desc.sdp ? lanOnlySdp(desc.sdp) : desc.sdp };
+  const filtered: RTCSessionDescriptionInit = { type: desc.type, sdp: desc.sdp ? lanOnlySdp(desc.sdp) : desc.sdp };
   const bytes = new TextEncoder().encode(JSON.stringify(filtered));
   const cs = new CompressionStream("deflate-raw");
   const w = cs.writable.getWriter();
