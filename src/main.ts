@@ -1,7 +1,7 @@
 import "./style.css";
 
 // ── Config — replace with your deployed Worker URL after running: cd relay && npx wrangler deploy
-const RELAY_WS = "wss://icarus-relay.YOURNAME.workers.dev";
+const RELAY_WS = "wss://icarus-relay.makeanother3.workers.dev";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 // ── HTML ──────────────────────────────────────────────────────────────────────
