@@ -91,10 +91,12 @@ function wireConn(c: DataConnection) {
   });
 
   c.on("close", () => {
-    setStatus("ready", "Disconnected — ready");
-    setConnected(false);
+    if (conn === c) {
+      setStatus("ready", "Disconnected — ready");
+      setConnected(false);
+      conn = null;
+    }
     log("Peer disconnected.", "system");
-    conn = null;
     console.log("[conn:close] peer disconnected");
   });
 
@@ -122,7 +124,14 @@ function initPeer() {
 
   p.on("connection", (c) => {
     console.log("[peer:connection] incoming from", c.peer);
-    conn ? c.close() : wireConn(c);
+    if (conn?.open) { c.close(); return; }
+    if (conn && !conn.open) {
+      // simultaneous connect: higher peer ID yields to incoming
+      if (p.id > c.peer) { conn.close(); wireConn(c); }
+      else c.close();
+      return;
+    }
+    wireConn(c);
   });
 
   p.on("error", (err) => {
