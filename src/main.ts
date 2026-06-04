@@ -97,11 +97,12 @@ let initiatorPc: RTCPeerConnection | null = null;
 
 // ── BroadcastChannel (same-browser auto-signaling) ────────────────────────────
 const bc = new BroadcastChannel("icarus");
+const bcSdp = (desc: RTCSessionDescription | RTCSessionDescriptionInit) => ({ type: desc.type, sdp: desc.sdp });
 bc.postMessage({ type: "ready" });
 
 bc.onmessage = async ({ data }) => {
   if (data.type === "ready" && initiatorPc?.localDescription) {
-    bc.postMessage({ type: "offer", sdp: initiatorPc.localDescription });
+    bc.postMessage({ type: "offer", sdp: bcSdp(initiatorPc.localDescription!) });
     autoStatus.textContent = "Other tab detected — waiting for answer…";
     console.log("[bc] re-sent offer to new tab");
   }
@@ -228,7 +229,7 @@ async function bcHandleOffer(sdpInit: RTCSessionDescriptionInit) {
   await pc.setLocalDescription(await pc.createAnswer());
   const desc = await waitForIce(pc);
 
-  bc.postMessage({ type: "answer", sdp: desc });
+  bc.postMessage({ type: "answer", sdp: bcSdp(desc) });
   autoAcceptNote.textContent = "Answer sent — waiting for connection…";
   console.log("[bc:answer] sent answer");
 }
@@ -249,7 +250,7 @@ btnOffer.addEventListener("click", async () => {
   const desc = await waitForIce(pc);
 
   // Broadcast for same-browser auto-connect
-  bc.postMessage({ type: "offer", sdp: desc });
+  bc.postMessage({ type: "offer", sdp: bcSdp(desc) });
   autoStatus.textContent = "Waiting for other tab…";
 
   // Encode for manual cross-device fallback
