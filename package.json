@@ -5,8 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "server": "bun run server.ts"
+    "build": "vite build"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -15,5 +14,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }
