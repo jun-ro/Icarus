@@ -204,7 +204,7 @@ async function publish(code: string, payload: object): Promise<void> {
 }
 
 async function fetchMessages(code: string): Promise<any[]> {
-  const res = await fetch(`${RELAY}${code}/json?poll=1&since=15m`);
+  const res = await fetch(`${RELAY}${code}/json?poll=1&since=1h`);
   const text = await res.text();
   return text.trim().split("\n").flatMap(line => {
     if (!line) return [];
@@ -313,27 +313,48 @@ btnJoinRoom.addEventListener("click", async () => {
   const code = codeInput.value.replace("-", "").trim();
   if (code.length < 6) return;
   btnJoinRoom.disabled = true;
-  joinStatus.textContent = "Looking up room…";
-  setStatus("connecting", "Looking up room…");
+  joinStatus.textContent = "Contacting relay…";
+  setStatus("connecting", "Contacting relay…");
 
   const pc = new RTCPeerConnection(RTC);
   pc.ondatachannel  = (e) => wireChannel(e.channel);
   pc.onicecandidate = (e) => console.log("[answer:ice]", e.candidate?.type ?? "done");
 
+  // First fetch unguarded — surfaces network errors immediately (e.g. relay blocked by proxy)
+  let offerMsg: any;
   try {
-    const offerMsg = await waitFor(code, "offer", 60_000);
-    joinStatus.textContent = "Found room. Generating answer…";
+    const initial = await fetchMessages(code);
+    offerMsg = initial.find(m => m.type === "offer");
+  } catch (err) {
+    setStatus("error", "Relay unreachable");
+    joinStatus.textContent = `Can't reach ntfy.sh — may be blocked on this network. (${err})`;
+    btnJoinRoom.disabled = false;
+    return;
+  }
 
+  if (!offerMsg) {
+    joinStatus.textContent = "Room not found yet, waiting…";
+    try {
+      offerMsg = await waitFor(code, "offer", 55_000);
+    } catch {
+      setStatus("error", "Room not found");
+      joinStatus.textContent = "Room not found. Check the code and try again.";
+      btnJoinRoom.disabled = false;
+      return;
+    }
+  }
+
+  try {
+    joinStatus.textContent = "Found room. Generating answer…";
     await pc.setRemoteDescription(await decode(offerMsg.sdp));
     await pc.setLocalDescription(await pc.createAnswer());
     const desc = await waitForIce(pc);
     await publish(code, { type: "answer", sdp: await encode(desc), sender: MY_ID });
-
     setStatus("connecting", "Connecting…");
     joinStatus.textContent = "Connecting…";
-  } catch {
-    setStatus("error", "Room not found or timed out");
-    joinStatus.textContent = "Room not found. Check the code and try again.";
+  } catch (err) {
+    setStatus("error", "Connection failed");
+    joinStatus.textContent = `Connection failed: ${err}`;
     btnJoinRoom.disabled = false;
   }
 });
