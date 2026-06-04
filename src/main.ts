@@ -113,7 +113,23 @@ let peer = initPeer();
 function initPeer() {
   const id = randId();
   console.log("[initPeer] registering with ID:", id);
-  const p = new Peer(id);
+  const p = new Peer(id, {
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        {
+          urls: [
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turn:openrelay.metered.ca:443?transport=tcp",
+          ],
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+      ],
+    },
+  });
 
   p.on("open", (id) => {
     myIdEl.textContent = id;
