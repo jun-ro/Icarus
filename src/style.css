@@ -1,0 +1,218 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d0f;
+  --surface: #16161a;
+  --border: #2a2a32;
+  --accent: #7c6af7;
+  --accent-dim: #5a4fd6;
+  --text: #e8e8f0;
+  --muted: #666680;
+  --system: #444460;
+  --sent-bg: #2a2460;
+  --recv-bg: #1e1e28;
+  --green: #4caf82;
+  --yellow: #f5a623;
+  --red: #e05c5c;
+  --radius: 12px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, sans-serif;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.container {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: min(700px, 90dvh);
+}
+
+header {
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.connect-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.connect-panel label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input[type="text"] {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: "JetBrains Mono", monospace, sans-serif;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input[type="text"]:focus { border-color: var(--accent); }
+input[type="text"]::placeholder { color: var(--muted); }
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+button:hover { background: var(--accent-dim); }
+button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.hint code {
+  background: var(--border);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85em;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.2rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot.disconnected { background: var(--red); }
+.dot.connecting { background: var(--yellow); animation: pulse 1s infinite; }
+.dot.connected { background: var(--green); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.client-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  background: var(--border);
+  padding: 0.2em 0.6em;
+  border-radius: 999px;
+}
+
+.messages {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 80%;
+}
+
+.message.sent { align-self: flex-end; align-items: flex-end; }
+.message.received { align-self: flex-start; }
+.message.system { align-self: center; max-width: 100%; }
+
+.message span:not(.label) {
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.message.sent span:not(.label) { background: var(--sent-bg); }
+.message.received span:not(.label) { background: var(--recv-bg); border: 1px solid var(--border); }
+.message.system span:not(.label) {
+  background: transparent;
+  color: var(--system);
+  font-size: 0.78rem;
+  text-align: center;
+  font-style: italic;
+  padding: 0.2rem 0;
+}
+
+.label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 0 0.2rem;
+}
+
+.compose {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.compose input { font-family: inherit; }
