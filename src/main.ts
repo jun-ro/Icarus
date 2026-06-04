@@ -1,11 +1,16 @@
 import "./style.css";
-import QRCode from "qrcode";
 
+// ── Config ────────────────────────────────────────────────────────────────────
+const RELAY = "https://ntfy.sh/icarus-";
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const MY_ID = crypto.randomUUID();
+
+// ── HTML ──────────────────────────────────────────────────────────────────────
 document.getElementById("app")!.innerHTML = `
   <div class="container">
     <header>
       <h1>Icarus</h1>
-      <p class="subtitle">Serverless P2P</p>
+      <p class="subtitle">LAN P2P</p>
     </header>
     <div class="status-bar">
       <span id="statusDot" class="dot init"></span>
@@ -15,10 +20,10 @@ document.getElementById("app")!.innerHTML = `
     <div id="stepRole" class="card">
       <label>Connect</label>
       <div class="btn-row">
-        <button id="btnOffer">Create Offer</button>
-        <button id="btnJoin">Enter Code</button>
+        <button id="btnOffer">Create Room</button>
+        <button id="btnJoin">Join Room</button>
       </div>
-      <p class="hint">Same browser: Create Offer → Open in new tab. Cross-device: share code.</p>
+      <p class="hint">Same browser: Create Room → Open in new tab. Cross-device: share the 6-char code.</p>
     </div>
 
     <div id="stepOffer" hidden>
@@ -28,29 +33,19 @@ document.getElementById("app")!.innerHTML = `
         <p id="autoStatus" class="hint"> </p>
       </div>
       <div class="card">
-        <label>Cross-device — send this code to peer</label>
-        <textarea id="offerOut" class="sdp-box" readonly placeholder="Generating…"></textarea>
-        <canvas id="offerQr" class="qr-canvas" hidden></canvas>
-        <button id="copyOffer" disabled>Copy Code</button>
-        <hr />
-        <label>Paste peer's answer code</label>
-        <textarea id="answerIn" class="sdp-box" placeholder="Paste answer code…"></textarea>
-        <button id="btnConnect" disabled>Connect</button>
+        <label>Room code — share with peer</label>
+        <div id="roomCodeDisplay" class="code-display">------</div>
+        <p id="offerStatus" class="hint">Generating…</p>
       </div>
     </div>
 
     <div id="stepAccept" hidden>
       <div class="card">
-        <label>Cross-device — paste offer code</label>
-        <textarea id="offerIn" class="sdp-box" placeholder="Paste offer code…"></textarea>
-        <button id="btnGenAnswer">Generate Answer</button>
-        <div id="answerSection" hidden>
-          <hr />
-          <label>Your answer code — copy and send back</label>
-          <textarea id="answerOut" class="sdp-box" readonly></textarea>
-          <canvas id="answerQr" class="qr-canvas"></canvas>
-          <button id="copyAnswer">Copy Answer</button>
-        </div>
+        <label>Enter room code</label>
+        <input id="codeInput" type="text" maxlength="7" placeholder="ABC-123"
+          class="code-input" autocomplete="off" spellcheck="false" />
+        <button id="btnJoinRoom" disabled>Join</button>
+        <p id="joinStatus" class="hint"> </p>
       </div>
     </div>
 
@@ -63,54 +58,40 @@ document.getElementById("app")!.innerHTML = `
 `;
 
 // ── Element refs ──────────────────────────────────────────────────────────────
-const statusDot    = document.getElementById("statusDot")!;
-const statusText   = document.getElementById("statusText")!;
-const stepRole     = document.getElementById("stepRole")!;
-const stepOffer    = document.getElementById("stepOffer")!;
-const stepAccept   = document.getElementById("stepAccept")!;
-const messagesEl   = document.getElementById("messages")!;
-const composeEl    = document.getElementById("compose")!;
-const btnOffer     = document.getElementById("btnOffer") as HTMLButtonElement;
-const btnJoin      = document.getElementById("btnJoin") as HTMLButtonElement;
-const btnNewTab    = document.getElementById("btnNewTab") as HTMLButtonElement;
-const autoStatus   = document.getElementById("autoStatus")!;
-const offerOut     = document.getElementById("offerOut") as HTMLTextAreaElement;
-const copyOffer    = document.getElementById("copyOffer") as HTMLButtonElement;
-const answerIn     = document.getElementById("answerIn") as HTMLTextAreaElement;
-const btnConnect   = document.getElementById("btnConnect") as HTMLButtonElement;
-const offerIn      = document.getElementById("offerIn") as HTMLTextAreaElement;
-const btnGenAnswer = document.getElementById("btnGenAnswer") as HTMLButtonElement;
-const answerSection = document.getElementById("answerSection")!;
-const answerOut    = document.getElementById("answerOut") as HTMLTextAreaElement;
-const copyAnswer   = document.getElementById("copyAnswer") as HTMLButtonElement;
-const offerQr      = document.getElementById("offerQr") as HTMLCanvasElement;
-const answerQr     = document.getElementById("answerQr") as HTMLCanvasElement;
-const msgInput     = document.getElementById("msgInput") as HTMLInputElement;
-const sendBtn      = document.getElementById("sendBtn") as HTMLButtonElement;
+const statusDot       = document.getElementById("statusDot")!;
+const statusText      = document.getElementById("statusText")!;
+const stepRole        = document.getElementById("stepRole")!;
+const stepOffer       = document.getElementById("stepOffer")!;
+const stepAccept      = document.getElementById("stepAccept")!;
+const messagesEl      = document.getElementById("messages")!;
+const composeEl       = document.getElementById("compose")!;
+const btnOffer        = document.getElementById("btnOffer") as HTMLButtonElement;
+const btnJoin         = document.getElementById("btnJoin") as HTMLButtonElement;
+const btnNewTab       = document.getElementById("btnNewTab") as HTMLButtonElement;
+const autoStatus      = document.getElementById("autoStatus")!;
+const roomCodeDisplay = document.getElementById("roomCodeDisplay")!;
+const offerStatus     = document.getElementById("offerStatus")!;
+const codeInput       = document.getElementById("codeInput") as HTMLInputElement;
+const btnJoinRoom     = document.getElementById("btnJoinRoom") as HTMLButtonElement;
+const joinStatus      = document.getElementById("joinStatus")!;
+const msgInput        = document.getElementById("msgInput") as HTMLInputElement;
+const sendBtn         = document.getElementById("sendBtn") as HTMLButtonElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let bcMode   = false;   // true when communicating over BroadcastChannel
-let isBcHost = false;   // true for the tab that clicked "Create Offer"
-let activeDc: RTCDataChannel | null = null;  // used only for cross-device WebRTC
+let bcMode   = false;
+let isBcHost = false;
+let activeDc: RTCDataChannel | null = null;
 
-// ── BroadcastChannel — same-browser messaging (no WebRTC needed) ──────────────
+// ── BroadcastChannel — same-browser auto-connect ──────────────────────────────
 const bc = new BroadcastChannel("icarus");
-
-// Announce presence so any waiting host re-sends its offer
 bc.postMessage({ type: "bc-ready" });
 
 bc.onmessage = ({ data }) => {
   switch (data.type) {
     case "bc-ready":
-      // A new tab opened — re-broadcast offer if we're the host
-      if (isBcHost && !bcMode) {
-        bc.postMessage({ type: "bc-offer" });
-        console.log("[bc] new tab detected, re-sent offer");
-      }
+      if (isBcHost && !bcMode) bc.postMessage({ type: "bc-offer" });
       break;
-
     case "bc-offer":
-      // Auto-accept: skip WebRTC entirely, use BC as the channel
       if (!bcMode && !isBcHost) {
         bcMode = true;
         bc.postMessage({ type: "bc-accept" });
@@ -118,10 +99,8 @@ bc.onmessage = ({ data }) => {
         setStatus("connected", "Connected");
         showChat();
         log("Connected.", "system");
-        console.log("[bc] auto-accepted, using BroadcastChannel");
       }
       break;
-
     case "bc-accept":
       if (isBcHost && !bcMode) {
         bcMode = true;
@@ -129,24 +108,17 @@ bc.onmessage = ({ data }) => {
         setStatus("connected", "Connected");
         showChat();
         log("Connected.", "system");
-        console.log("[bc] peer accepted, using BroadcastChannel");
       }
       break;
-
     case "bc-msg":
-      if (bcMode) {
-        log(data.text, "received");
-        console.log("[bc] received:", data.text);
-      }
+      if (bcMode) log(data.text, "received");
       break;
-
     case "bc-bye":
       if (bcMode) {
         bcMode = false;
         isBcHost = false;
         setStatus("ready", "Peer disconnected");
         log("Peer disconnected.", "system");
-        console.log("[bc] peer disconnected");
       }
       break;
   }
@@ -178,13 +150,10 @@ function showChat() {
   composeEl.hidden  = false;
 }
 
-function makeCopyBtn(btn: HTMLButtonElement, getText: () => string) {
-  btn.addEventListener("click", () => {
-    navigator.clipboard.writeText(getText());
-    const orig = btn.textContent;
-    btn.textContent = "Copied!";
-    setTimeout(() => (btn.textContent = orig), 1500);
-  });
+function genCode(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(6)))
+    .map(b => CODE_CHARS[b % CODE_CHARS.length])
+    .join("");
 }
 
 function waitForIce(pc: RTCPeerConnection): Promise<RTCSessionDescription> {
@@ -198,8 +167,16 @@ function waitForIce(pc: RTCPeerConnection): Promise<RTCSessionDescription> {
   });
 }
 
-async function encode(sdp: RTCSessionDescriptionInit): Promise<string> {
-  const bytes = new TextEncoder().encode(JSON.stringify(sdp));
+// Strip STUN-reflexive and relay candidates — only use local LAN IPs
+function lanOnlySdp(sdp: string): string {
+  return sdp.split("\n")
+    .filter(line => !line.startsWith("a=candidate:") || line.includes("typ host"))
+    .join("\n");
+}
+
+async function encode(desc: RTCSessionDescriptionInit): Promise<string> {
+  const filtered = { ...desc, sdp: desc.sdp ? lanOnlySdp(desc.sdp) : desc.sdp };
+  const bytes = new TextEncoder().encode(JSON.stringify(filtered));
   const cs = new CompressionStream("deflate-raw");
   const w = cs.writable.getWriter();
   w.write(bytes); w.close();
@@ -218,7 +195,42 @@ async function decode(b64: string): Promise<RTCSessionDescriptionInit> {
   return JSON.parse(await new Response(ds.readable).text());
 }
 
-// ── WebRTC config (cross-device only) ────────────────────────────────────────
+// ── ntfy.sh relay ─────────────────────────────────────────────────────────────
+async function publish(code: string, payload: object): Promise<void> {
+  await fetch(RELAY + code, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+async function fetchMessages(code: string): Promise<any[]> {
+  const res = await fetch(`${RELAY}${code}/json?poll=1&since=15m`);
+  const text = await res.text();
+  return text.trim().split("\n").flatMap(line => {
+    if (!line) return [];
+    try {
+      const ev = JSON.parse(line);
+      if (ev.event !== "message") return [];
+      const payload = JSON.parse(ev.message);
+      return payload.sender !== MY_ID ? [payload] : [];
+    } catch { return []; }
+  });
+}
+
+async function waitFor(code: string, type: string, timeoutMs = 90_000): Promise<any> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const msgs = await fetchMessages(code);
+      const found = msgs.find(m => m.type === type);
+      if (found) return found;
+    } catch {}
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  throw new Error("timeout");
+}
+
+// ── WebRTC ────────────────────────────────────────────────────────────────────
 const RTC: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -228,79 +240,103 @@ const RTC: RTCConfiguration = {
 
 function wireChannel(dc: RTCDataChannel) {
   activeDc = dc;
-  dc.onopen  = () => { setStatus("connected", "Connected"); showChat(); log("Connected.", "system"); };
-  dc.onclose = () => { setStatus("ready", "Disconnected"); log("Peer disconnected.", "system"); activeDc = null; };
-  dc.onmessage = (e) => { log(String(e.data), "received"); console.log("[dc:msg]", e.data); };
+  dc.onopen    = () => { setStatus("connected", "Connected"); showChat(); log("Connected.", "system"); };
+  dc.onclose   = () => { setStatus("ready", "Disconnected"); log("Peer disconnected.", "system"); activeDc = null; };
+  dc.onmessage = (e) => log(String(e.data), "received");
   dc.onerror   = (e) => console.error("[dc:error]", e);
 }
 
-// ── Create Offer (host) ───────────────────────────────────────────────────────
+// ── Create Room (host) ────────────────────────────────────────────────────────
 btnOffer.addEventListener("click", async () => {
   isBcHost = true;
   stepRole.hidden  = true;
   stepOffer.hidden = false;
-  setStatus("ready", "Open new tab — or share code for cross-device");
 
-  // Broadcast immediately for same-browser auto-connect
   bc.postMessage({ type: "bc-offer" });
   autoStatus.textContent = "Waiting for other tab…";
 
-  // Generate WebRTC offer in background for cross-device fallback
-  setStatus("connecting", "Generating code…");
+  const code = genCode();
+  roomCodeDisplay.textContent = `${code.slice(0, 3)}-${code.slice(3)}`;
+  setStatus("connecting", "Generating…");
+
   const pc = new RTCPeerConnection(RTC);
-  wireChannel(pc.createDataChannel("icarus"));
+  // Unreliable, unordered — UDP-like for rollback netcode
+  wireChannel(pc.createDataChannel("rollback", { ordered: false, maxRetransmits: 0 }));
   pc.onicecandidate = (e) => console.log("[offer:ice]", e.candidate?.type ?? "done");
+
   await pc.setLocalDescription(await pc.createOffer());
   const desc = await waitForIce(pc);
-  offerOut.value     = await encode(desc);
-  copyOffer.disabled = false;
-  setStatus("ready", "Open new tab — or share code for cross-device");
-  await QRCode.toCanvas(offerQr, offerOut.value, { width: 220, margin: 1 });
-  offerQr.hidden = false;
-  console.log("[offer] WebRTC offer ready");
 
-  answerIn.addEventListener("input", () => { btnConnect.disabled = !answerIn.value.trim(); });
-  btnConnect.addEventListener("click", async () => {
+  try {
+    await publish(code, { type: "offer", sdp: await encode(desc), sender: MY_ID });
+  } catch {
+    offerStatus.textContent = "Could not reach relay. Check network.";
+    setStatus("error", "Relay unreachable");
+    return;
+  }
+
+  setStatus("ready", "Share code — waiting for peer");
+  offerStatus.textContent = "Waiting for peer to join…";
+
+  waitFor(code, "answer").then(async msg => {
+    if (bcMode) return;
     try {
-      await pc.setRemoteDescription(await decode(answerIn.value.trim()));
+      await pc.setRemoteDescription(await decode(msg.sdp));
       setStatus("connecting", "Connecting…");
-    } catch { setStatus("error", "Invalid answer code"); }
+    } catch { setStatus("error", "Connection failed"); }
+  }).catch(() => {
+    if (!bcMode) {
+      offerStatus.textContent = "Timed out. Refresh to try again.";
+      setStatus("error", "Timed out");
+    }
   });
 });
 
 btnNewTab.addEventListener("click", () => window.open(location.href, "_blank"));
 
-// ── Enter Code (join, cross-device) ──────────────────────────────────────────
+// ── Join Room ─────────────────────────────────────────────────────────────────
 btnJoin.addEventListener("click", () => {
   stepRole.hidden   = true;
   stepAccept.hidden = false;
-  setStatus("ready", "Paste offer code and click Generate Answer");
+  setStatus("ready", "Enter room code");
+  codeInput.focus();
 });
 
-btnGenAnswer.addEventListener("click", async () => {
-  const raw = offerIn.value.trim();
-  if (!raw) return;
-  btnGenAnswer.disabled = true;
-  setStatus("connecting", "Gathering ICE candidates…");
+codeInput.addEventListener("input", () => {
+  let val = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (val.length > 3) val = val.slice(0, 3) + "-" + val.slice(3, 6);
+  codeInput.value = val;
+  btnJoinRoom.disabled = val.replace("-", "").length < 6;
+});
+
+btnJoinRoom.addEventListener("click", async () => {
+  const code = codeInput.value.replace("-", "").trim();
+  if (code.length < 6) return;
+  btnJoinRoom.disabled = true;
+  joinStatus.textContent = "Looking up room…";
+  setStatus("connecting", "Looking up room…");
 
   const pc = new RTCPeerConnection(RTC);
-  pc.ondatachannel = (e) => { wireChannel(e.channel); console.log("[answer] got dc"); };
+  pc.ondatachannel  = (e) => wireChannel(e.channel);
   pc.onicecandidate = (e) => console.log("[answer:ice]", e.candidate?.type ?? "done");
 
   try {
-    await pc.setRemoteDescription(await decode(raw));
+    const offerMsg = await waitFor(code, "offer", 60_000);
+    joinStatus.textContent = "Found room. Generating answer…";
+
+    await pc.setRemoteDescription(await decode(offerMsg.sdp));
     await pc.setLocalDescription(await pc.createAnswer());
     const desc = await waitForIce(pc);
-    answerOut.value      = await encode(desc);
-    answerSection.hidden = false;
-    await QRCode.toCanvas(answerQr, answerOut.value, { width: 220, margin: 1 });
-    setStatus("ready", "Copy answer code → send to peer");
-  } catch { setStatus("error", "Invalid offer code"); btnGenAnswer.disabled = false; }
-});
+    await publish(code, { type: "answer", sdp: await encode(desc), sender: MY_ID });
 
-// ── Copy buttons ──────────────────────────────────────────────────────────────
-makeCopyBtn(copyOffer,  () => offerOut.value);
-makeCopyBtn(copyAnswer, () => answerOut.value);
+    setStatus("connecting", "Connecting…");
+    joinStatus.textContent = "Connecting…";
+  } catch {
+    setStatus("error", "Room not found or timed out");
+    joinStatus.textContent = "Room not found. Check the code and try again.";
+    btnJoinRoom.disabled = false;
+  }
+});
 
 // ── Send message ──────────────────────────────────────────────────────────────
 function sendMessage() {
@@ -310,7 +346,7 @@ function sendMessage() {
     bc.postMessage({ type: "bc-msg", text });
     log(text, "sent");
     msgInput.value = "";
-  } else if (activeDc) {
+  } else if (activeDc?.readyState === "open") {
     activeDc.send(text);
     log(text, "sent");
     msgInput.value = "";

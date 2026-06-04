@@ -195,33 +195,36 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn-row { display: flex; gap: 0.5rem; }
 .btn-row button { flex: 1; }
 
-textarea.sdp-box {
+.code-display {
+  font-family: "JetBrains Mono", monospace, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+  text-align: center;
+  padding: 0.7rem 1rem;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.55rem 0.75rem;
-  color: var(--text);
-  font-size: 0.75rem;
+}
+
+.code-input {
+  flex: none;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  color: var(--accent);
   font-family: "JetBrains Mono", monospace, sans-serif;
-  resize: vertical;
-  min-height: 90px;
-  max-height: 160px;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-transform: uppercase;
   outline: none;
-  line-height: 1.4;
   transition: border-color 0.15s;
 }
-textarea.sdp-box:focus { border-color: var(--accent); }
-textarea.sdp-box::placeholder { color: var(--muted); }
-textarea.sdp-box[readonly] { opacity: 0.8; }
 
-.card hr { border: none; border-top: 1px solid var(--border); margin: 0.25rem 0; }
-.card small { font-size: 0.7rem; color: var(--muted); text-transform: none; letter-spacing: 0; }
-
-#answerSection { display: flex; flex-direction: column; gap: 0.5rem; }
-
-.qr-canvas {
-  align-self: center;
-  border-radius: 8px;
-  padding: 8px;
-  background: #fff;
-}
+.code-input:focus { border-color: var(--accent); }
+.code-input::placeholder { color: var(--muted); font-size: 1.4rem; letter-spacing: 0.1em; }
