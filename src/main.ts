@@ -167,15 +167,15 @@ function waitForIce(pc: RTCPeerConnection): Promise<RTCSessionDescription> {
   });
 }
 
-// Strip STUN-reflexive and relay candidates — only use local LAN IPs
-function lanOnlySdp(sdp: string): string {
+// Keep host (direct LAN) and relay (TURN) candidates; drop srflx (redundant)
+function filterSdp(sdp: string): string {
   return sdp.split("\n")
-    .filter(line => !line.startsWith("a=candidate:") || line.includes("typ host"))
+    .filter(line => !line.startsWith("a=candidate:") || line.includes("typ host") || line.includes("typ relay"))
     .join("\n");
 }
 
 async function encode(desc: RTCSessionDescriptionInit): Promise<string> {
-  const filtered: RTCSessionDescriptionInit = { type: desc.type, sdp: desc.sdp ? lanOnlySdp(desc.sdp) : desc.sdp };
+  const filtered: RTCSessionDescriptionInit = { type: desc.type, sdp: desc.sdp ? filterSdp(desc.sdp) : desc.sdp };
   const bytes = new TextEncoder().encode(JSON.stringify(filtered));
   const cs = new CompressionStream("deflate-raw");
   const w = cs.writable.getWriter();
@@ -235,6 +235,16 @@ const RTC: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    // Free TURN relay — fallback when direct LAN is blocked (AP isolation)
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turns:openrelay.metered.ca:443",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
 };
 
