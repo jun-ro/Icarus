@@ -76,15 +76,18 @@ function log(text: string, cls: "sent" | "received" | "system") {
 function wireConn(c: DataConnection) {
   conn = c;
   setStatus("connecting", "Connecting…");
+  console.log("[wireConn] attempting connection to", c.peer);
 
   c.on("open", () => {
     setStatus("connected", `Connected to ${c.peer}`);
     setConnected(true);
     log(`Connected to ${c.peer}.`, "system");
+    console.log("[conn:open] connected to", c.peer);
   });
 
   c.on("data", (data) => {
     log(String(data), "received");
+    console.log("[conn:data] received:", data);
   });
 
   c.on("close", () => {
@@ -92,30 +95,44 @@ function wireConn(c: DataConnection) {
     setConnected(false);
     log("Peer disconnected.", "system");
     conn = null;
+    console.log("[conn:close] peer disconnected");
   });
 
   c.on("error", (err) => {
     log(`Error: ${err.message}`, "system");
+    console.error("[conn:error]", err);
   });
 }
 
-const peer = new Peer();
+const randId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
-peer.on("open", (id) => {
-  myIdEl.textContent = id;
-  copyBtn.disabled   = false;
-  connectBtn.disabled = false;
-  setStatus("ready", "Ready — waiting for connection");
-});
+let peer = initPeer();
 
-peer.on("connection", (c) => {
-  if (conn) { c.close(); return; }
-  wireConn(c);
-});
+function initPeer() {
+  const id = randId();
+  console.log("[initPeer] registering with ID:", id);
+  const p = new Peer(id);
 
-peer.on("error", (err) => {
-  setStatus("error", `Error: ${err.message}`);
-});
+  p.on("open", (id) => {
+    myIdEl.textContent = id;
+    copyBtn.disabled = connectBtn.disabled = false;
+    setStatus("ready", "Ready — waiting for connection");
+    console.log("[peer:open] ready, ID:", id);
+  });
+
+  p.on("connection", (c) => {
+    console.log("[peer:connection] incoming from", c.peer);
+    conn ? c.close() : wireConn(c);
+  });
+
+  p.on("error", (err) => {
+    console.error("[peer:error]", (err as any).type, err.message);
+    if ((err as any).type === "unavailable-id") { peer.destroy(); peer = initPeer(); return; }
+    setStatus("error", `Error: ${err.message}`);
+  });
+
+  return p;
+}
 
 copyBtn.addEventListener("click", () => {
   navigator.clipboard.writeText(myIdEl.textContent ?? "");
