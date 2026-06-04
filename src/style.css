@@ -216,3 +216,31 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 }
 
 .compose input { font-family: inherit; }
+
+.https-banner {
+  background: #2a1a0a;
+  border: 1px solid #7a4a10;
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #e8c87a;
+}
+
+.https-banner-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.https-banner p { color: #c8a85a; }
+.https-banner code {
+  background: rgba(255,255,255,0.08);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85em;
+  color: #f5d08a;
+}

@@ -1,5 +1,17 @@
+import { readFileSync } from "fs";
+import { join } from "path";
+import os from "os";
+
 const PORT = 8080;
 const clients = new Set<ServerWebSocket<unknown>>();
+
+const htmlPath = join(import.meta.dir, "dist", "index.html");
+let html: string;
+try {
+  html = readFileSync(htmlPath, "utf8");
+} catch {
+  html = "<h1>Run <code>bun run build</code> first to generate dist/index.html</h1>";
+}
 
 const server = Bun.serve({
   port: PORT,
@@ -12,9 +24,7 @@ const server = Bun.serve({
       return undefined;
     }
 
-    return new Response("Icarus WebSocket Server running. Connect via ws://<your-ip>:8080/ws", {
-      headers: { "Content-Type": "text/plain" },
-    });
+    return new Response(html, { headers: { "Content-Type": "text/html" } });
   },
   websocket: {
     open(ws) {
@@ -22,9 +32,8 @@ const server = Bun.serve({
       broadcast({ type: "system", text: `A device joined. (${clients.size} connected)`, count: clients.size });
       console.log(`Client connected. Total: ${clients.size}`);
     },
-    message(ws, raw) {
+    message(_ws, raw) {
       const data = typeof raw === "string" ? raw : raw.toString();
-      // relay to all clients including sender
       clients.forEach((client) => client.send(data));
     },
     close(ws) {
@@ -40,13 +49,14 @@ function broadcast(payload: object) {
   clients.forEach((client) => client.send(msg));
 }
 
-const ifaces = require("os").networkInterfaces();
-const ips = Object.values(ifaces)
+const ifaces = Object.values(os.networkInterfaces())
   .flat()
-  .filter((i: any) => i.family === "IPv4" && !i.internal)
-  .map((i: any) => i.address);
+  .filter((i): i is os.NetworkInterfaceInfo => !!i && i.family === "IPv4" && !i.internal)
+  .map((i) => i.address);
 
 console.log(`\nIcarus WS server on port ${PORT}`);
-console.log(`Local network addresses:`);
-ips.forEach((ip: string) => console.log(`  ws://${ip}:${PORT}/ws`));
-console.log(`\nOpen the app on any device on the same network and paste one of the addresses above.\n`);
+console.log(`Open on any device on the same network:`);
+ifaces.forEach((ip) => console.log(`  http://${ip}:${PORT}`));
+console.log(`\nWebSocket endpoint:`);
+ifaces.forEach((ip) => console.log(`  ws://${ip}:${PORT}/ws`));
+console.log();

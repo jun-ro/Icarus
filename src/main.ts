@@ -2,6 +2,8 @@ import "./style.css";
 
 const app = document.getElementById("app")!;
 
+const isHttps = location.protocol === "https:";
+
 app.innerHTML = `
   <div class="container">
     <header>
@@ -9,7 +11,19 @@ app.innerHTML = `
       <p class="subtitle">WebSocket local network demo</p>
     </header>
 
-    <div class="connect-panel" id="connectPanel">
+    ${isHttps ? `
+    <div class="https-banner">
+      <div class="https-banner-title">⚠ HTTPS blocks local WebSocket</div>
+      <p>Browsers block <code>ws://</code> from HTTPS pages. To use the demo, open it directly from the server:</p>
+      <div class="input-row" style="margin-top:0.6rem">
+        <input id="ipInput" type="text" placeholder="192.168.x.x" style="font-size:0.9rem" />
+        <button id="goBtn">Open</button>
+      </div>
+      <p class="hint" style="margin-top:0.5rem">Run <code>bun run server</code> on the host — it prints the IP. Enter it above to open <code>http://[ip]:8080</code>.</p>
+    </div>
+    ` : ""}
+
+    <div class="connect-panel" id="connectPanel" ${isHttps ? 'style="opacity:0.4;pointer-events:none"' : ""}>
       <label for="serverUrl">Server WebSocket URL</label>
       <div class="input-row">
         <input id="serverUrl" type="text" placeholder="ws://192.168.x.x:8080/ws" autocomplete="off" spellcheck="false" />
@@ -32,6 +46,17 @@ app.innerHTML = `
     </div>
   </div>
 `;
+
+if (isHttps) {
+  const ipInput = document.getElementById("ipInput") as HTMLInputElement;
+  const goBtn = document.getElementById("goBtn") as HTMLButtonElement;
+  const open = () => {
+    const ip = ipInput.value.trim();
+    if (ip) window.open(`http://${ip}:8080`, "_blank");
+  };
+  goBtn.addEventListener("click", open);
+  ipInput.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+}
 
 const serverUrlInput = document.getElementById("serverUrl") as HTMLInputElement;
 const connectBtn = document.getElementById("connectBtn") as HTMLButtonElement;
@@ -116,5 +141,4 @@ function sendMessage() {
 
 sendBtn.addEventListener("click", sendMessage);
 msgInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(); });
-
 serverUrlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") connectBtn.click(); });
