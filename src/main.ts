@@ -163,7 +163,7 @@ function waitForIce(pc: RTCPeerConnection): Promise<RTCSessionDescription> {
     pc.addEventListener("icegatheringstatechange", () => {
       if (pc.iceGatheringState === "complete") done();
     });
-    setTimeout(done, 8000);
+    setTimeout(done, 15000);
   });
 }
 
@@ -248,6 +248,17 @@ const RTC: RTCConfiguration = {
   ],
 };
 
+function wireIce(pc: RTCPeerConnection, label: string, onFailed: () => void) {
+  pc.onicecandidate = (e) => {
+    if (e.candidate) console.log(`[${label}:ice]`, e.candidate.type, e.candidate.address);
+    else console.log(`[${label}:ice] gathering complete`);
+  };
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[${label}:ice:state]`, pc.iceConnectionState);
+    if (pc.iceConnectionState === "failed") onFailed();
+  };
+}
+
 function wireChannel(dc: RTCDataChannel) {
   activeDc = dc;
   dc.onopen    = () => { setStatus("connected", "Connected"); showChat(); log("Connected.", "system"); };
@@ -272,7 +283,9 @@ btnOffer.addEventListener("click", async () => {
   const pc = new RTCPeerConnection(RTC);
   // Unreliable, unordered — UDP-like for rollback netcode
   wireChannel(pc.createDataChannel("rollback", { ordered: false, maxRetransmits: 0 }));
-  pc.onicecandidate = (e) => console.log("[offer:ice]", e.candidate?.type ?? "done");
+  wireIce(pc, "offer", () => {
+    if (!bcMode) setStatus("error", "ICE failed — both direct and relay paths blocked on this network");
+  });
 
   await pc.setLocalDescription(await pc.createOffer());
   const desc = await waitForIce(pc);
@@ -327,8 +340,11 @@ btnJoinRoom.addEventListener("click", async () => {
   setStatus("connecting", "Contacting relay…");
 
   const pc = new RTCPeerConnection(RTC);
-  pc.ondatachannel  = (e) => wireChannel(e.channel);
-  pc.onicecandidate = (e) => console.log("[answer:ice]", e.candidate?.type ?? "done");
+  pc.ondatachannel = (e) => wireChannel(e.channel);
+  wireIce(pc, "answer", () => {
+    setStatus("error", "ICE failed — both direct and relay paths blocked on this network");
+    joinStatus.textContent = "Connection failed. Check console for candidate types gathered.";
+  });
 
   // First fetch unguarded — surfaces network errors immediately (e.g. relay blocked by proxy)
   let offerMsg: any;
