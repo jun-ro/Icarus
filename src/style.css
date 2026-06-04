@@ -218,3 +218,10 @@ textarea.sdp-box[readonly] { opacity: 0.8; }
 .card small { font-size: 0.7rem; color: var(--muted); text-transform: none; letter-spacing: 0; }
 
 #answerSection { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.qr-canvas {
+  align-self: center;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}

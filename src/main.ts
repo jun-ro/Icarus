@@ -1,4 +1,5 @@
 import "./style.css";
+import QRCode from "qrcode";
 
 document.getElementById("app")!.innerHTML = `
   <div class="container">
@@ -29,6 +30,7 @@ document.getElementById("app")!.innerHTML = `
       <div class="card">
         <label>Cross-device — send this code to peer</label>
         <textarea id="offerOut" class="sdp-box" readonly placeholder="Generating…"></textarea>
+        <canvas id="offerQr" class="qr-canvas" hidden></canvas>
         <button id="copyOffer" disabled>Copy Code</button>
         <hr />
         <label>Paste peer's answer code</label>
@@ -46,6 +48,7 @@ document.getElementById("app")!.innerHTML = `
           <hr />
           <label>Your answer code — copy and send back</label>
           <textarea id="answerOut" class="sdp-box" readonly></textarea>
+          <canvas id="answerQr" class="qr-canvas"></canvas>
           <button id="copyAnswer">Copy Answer</button>
         </div>
       </div>
@@ -80,6 +83,8 @@ const btnGenAnswer = document.getElementById("btnGenAnswer") as HTMLButtonElemen
 const answerSection = document.getElementById("answerSection")!;
 const answerOut    = document.getElementById("answerOut") as HTMLTextAreaElement;
 const copyAnswer   = document.getElementById("copyAnswer") as HTMLButtonElement;
+const offerQr      = document.getElementById("offerQr") as HTMLCanvasElement;
+const answerQr     = document.getElementById("answerQr") as HTMLCanvasElement;
 const msgInput     = document.getElementById("msgInput") as HTMLInputElement;
 const sendBtn      = document.getElementById("sendBtn") as HTMLButtonElement;
 
@@ -250,6 +255,8 @@ btnOffer.addEventListener("click", async () => {
   offerOut.value     = await encode(desc);
   copyOffer.disabled = false;
   setStatus("ready", "Open new tab — or share code for cross-device");
+  await QRCode.toCanvas(offerQr, offerOut.value, { width: 220, margin: 1 });
+  offerQr.hidden = false;
   console.log("[offer] WebRTC offer ready");
 
   answerIn.addEventListener("input", () => { btnConnect.disabled = !answerIn.value.trim(); });
@@ -286,6 +293,7 @@ btnGenAnswer.addEventListener("click", async () => {
     const desc = await waitForIce(pc);
     answerOut.value      = await encode(desc);
     answerSection.hidden = false;
+    await QRCode.toCanvas(answerQr, answerOut.value, { width: 220, margin: 1 });
     setStatus("ready", "Copy answer code → send to peer");
   } catch { setStatus("error", "Invalid offer code"); btnGenAnswer.disabled = false; }
 });
