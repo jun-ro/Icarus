@@ -11,7 +11,7 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      external: [],
+      external: ["pixi.js"],
       output: {
         inlineDynamicImports: true,
       },
