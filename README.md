@@ -1,43 +1,48 @@
 
-# Icarus OS
+# Icarus
 [![MIT License](https://img.shields.io/github/license/Ileriayo/markdown-badges?style=for-the-badge)](https://choosealicense.com/licenses/mit/)
-![Google Chrome](https://img.shields.io/badge/Google%20Chrome-4285F4?style=for-the-badge&logo=GoogleChrome&logoColor=white)
-![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB)
 
+A 2D multiplayer game engine built on [PixiJS](https://pixijs.com/), with rollback netcode for deterministic online play over a WebSocket relay.
 
-A brief description of what this project does and who it's for
+## Architecture
 
+### Engine (`src/engine/`)
 
-## How to run:
+A lightweight ECS-style framework wrapping PixiJS v8:
 
-###  Windows/Linux/Mac:
-```
+| Module | Purpose |
+|---|---|
+| `Engine` | Initializes the PixiJS `Application`, manages the game loop, and handles scene transitions |
+| `Scene` | Owns a collection of `Entity` instances; routes `update` ticks and handles spawn/despawn |
+| `Entity` | Base class for game objects — wraps a PixiJS `Container` and exposes `onInit`, `onUpdate`, `onDestroy` lifecycle hooks |
+| `Input` | Global keyboard state (held / pressed / released) with bitmask helpers for rollback-safe input serialization |
+| `Collision` | AABB overlap and point-in-rect tests |
+| `Signal` | Typed event emitter |
+
+### Rollback Netcode (`src/rollback.ts`)
+
+`RollbackSession` implements GGPO-style rollback for two-player matches:
+
+- Sends a 5-byte packet per frame `[frame: u32le, input: u8]` over any `Transport` (WebSocket, etc.)
+- Maintains a ring buffer of up to `maxRollback` (default 8) state snapshots
+- On misprediction: restores the divergent snapshot and re-simulates up to the present frame
+- Early-arriving remote inputs are parked in a future-input map and consumed when their frame is reached
+- `onDesynced` fires when a remote input arrives outside the rollback window
+
+The transport is abstraction-first — anything with `send`, `addEventListener`, and `readyState` works.
+
+## Stack
+
+- **Renderer** — PixiJS v8
+- **Bundler** — Vite
+- **Language** — TypeScript
+- **Runtime** — Bun
+
+## Getting started
+
+```sh
 git clone https://github.com/jun-ro/Icarus.git
-
-npm install
-
-npm start 
+cd Icarus
+bun install
+bun run dev
 ```
-### ChromeOS (Locked Down):
-
-#### 1. Download the github file somehow
-#### 2. Go to ["Data URI Generator"](https://dopiaza.org/tools/datauri/)
-#### 3. Click on "Choose File"
-#### 4. Click on the "build" folder of the Icarus folder
-#### 5. Click on the "main.html" file.
-#### 6. Click on Generate Data URI
-#### 7. Copy link and paste in a new tab
-#### 8. Enjoy! 🍧
-
-
-## Contributing
-
-#### If you want to contribute you can clone the repo and add to the project's source code yourself!
-
-
-## Acknowledgements
-
- - [Classic-Tetris-JS](https://www.npmjs.com/package/classic-tetris-js)
- - [Mercury Proxy](https://github.com/korruu/Mercury)
-
-
